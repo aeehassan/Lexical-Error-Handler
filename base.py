@@ -122,7 +122,6 @@ class Lexer:
         # The above depicts usage of RegEx to match the pattern
 
 class Error(Lexer):
-    error_type = ""
 
     MAX_ID_LENGTH = 30
     # Using int as 2 bytes
@@ -135,8 +134,11 @@ class Error(Lexer):
 
     def __init__(self, lexeme_with_error):
         self.error = lexeme_with_error
+
     def detect(self, error_substring):
-        pass
+        error_type = ""
+        if (): 
+            pass
     def report(self):
         pass
     def recover(self):
@@ -146,8 +148,8 @@ class Error(Lexer):
         
         # Phrase level
         # Fix misspellings in keywords
-
         pass
+
     # All supported error types
     def __is_id_too_long(self, error): 
         state = False
@@ -185,7 +187,7 @@ class Error(Lexer):
                 return True
         return False
     
-    def is_string_ill_formed(self, error):
+    def __is_string_ill_formed(self, error):
         # Handle the case when the string is empty 
         # (to avoid index errors)
         if len(error) < 2:
@@ -213,9 +215,3 @@ class Error(Lexer):
 
 # print("\nCode terminated...\n")
 
-error = Error("")
-
-print(error.is_string_ill_formed("\"ABxTai\""))
-print(error.is_string_ill_formed("\"ABxTai"))
-print(error.is_string_ill_formed("\'ABxTai\'"))
-print(error.is_string_ill_formed("\"ABxTai\'"))
