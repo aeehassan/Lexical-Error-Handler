@@ -1,6 +1,7 @@
 # Import
 import re
 import numpy as np
+import string
 
 # Token types based on the implementation scope
 TT_kw = 'Keyword'
@@ -171,8 +172,18 @@ class Error(Lexer):
                     return True   
         return False
 
-    def __is_num_ill_formed(self, error):
-        pass
+    def is_num_ill_formed(self, error):
+        # To check if special characters are in the number
+        invalid_chars = string.ascii_letters + string.punctuation.replace('.', '') + string.whitespace
+        # To check if there are two dps in the number
+        count_of_dps = 0
+
+        for char in error:
+            if char == '.':
+                count_of_dps += 1
+            if char in invalid_chars or count_of_dps == 2:
+                return True
+        return False
     def __is_string_ill_formed(self):
         pass
 
@@ -189,4 +200,3 @@ class Error(Lexer):
 #     print(f'{tokens} \n')
 
 # print("\nCode terminated...\n")
-
