@@ -172,7 +172,7 @@ class Error(Lexer):
                     return True   
         return False
 
-    def is_num_ill_formed(self, error):
+    def __is_num_ill_formed(self, error):
         # To check if special characters are in the number
         invalid_chars = string.ascii_letters + string.punctuation.replace('.', '') + string.whitespace
         # To check if there are two dps in the number
@@ -184,8 +184,20 @@ class Error(Lexer):
             if char in invalid_chars or count_of_dps == 2:
                 return True
         return False
-    def __is_string_ill_formed(self):
-        pass
+    
+    def is_string_ill_formed(self, error):
+        # Handle the case when the string is empty 
+        # (to avoid index errors)
+        if len(error) < 2:
+            # Too short to be properly quoted
+            return True
+        # The -1 indexing works because sequences
+        # support -ve indexing as a way to count
+        # from the end
+        if ((error[0] == '"') and (error[-1] == '"')) or ((error[0] == "'") and (error[-1] == "'")): 
+            return False
+        
+        return True
 
 #######################################################
 ##### Error Handler Code
@@ -200,3 +212,10 @@ class Error(Lexer):
 #     print(f'{tokens} \n')
 
 # print("\nCode terminated...\n")
+
+error = Error("")
+
+print(error.is_string_ill_formed("\"ABxTai\""))
+print(error.is_string_ill_formed("\"ABxTai"))
+print(error.is_string_ill_formed("\'ABxTai\'"))
+print(error.is_string_ill_formed("\"ABxTai\'"))
