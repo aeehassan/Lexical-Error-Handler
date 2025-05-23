@@ -103,7 +103,7 @@ class Lexer:
                     pass
                 elif corrected_lexeme != None:
                     # This indexes the semicolon token
-                    lexeme = lexeme[corrected_lexeme]
+                    lexeme = lexemes[corrected_lexeme]
                 # Phrase level - Deduces its type then adds to list
                 elif corrected_lexeme in KEYWORDS:
                     tokens.append(Token(TT_kw, corrected_lexeme))
