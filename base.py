@@ -1,3 +1,8 @@
+####
+# Problems encountered
+# 1. Exceeded Recursion call stack error
+# ##
+
 # Import
 import re
 import numpy as np
@@ -14,7 +19,7 @@ TT_float_op = 'Float operand'
 TT_int_op = 'Integer operand'
 
 # Token patterns
-KEYWORDS = {"if", "else", "while", "for", "return", "int", "float", "char", "in", "class", "def"}
+KEYWORDS = {"if", "else", "while", "for", "return", "int", "float", "char", "class", "def"}
 OPERATORS = {'+', '-', '*', '/', '=', '==', '!=', '<', '>', '<=', '>='}
 PUNCTUATIONS = {';', ',', '(', ')', '{', '}'}
 
@@ -88,7 +93,22 @@ class Lexer:
                 tokens.append(Token(TT_lit, lexeme.strip('"')))
             else:
                 # Reserved for error handler
-                pass
+                error = Error()
+                error.detect(lexeme)
+                error.report()
+                # Recovers from error with the corrected lexeme as output
+                corrected_lexeme = error.recover(lexeme, lexemes)
+
+                if corrected_lexeme == None:
+                    pass
+                elif corrected_lexeme != None:
+                    # This indexes the semicolon token
+                    lexeme = lexeme[corrected_lexeme]
+                # Phrase level - Deduces its type then adds to list
+                elif corrected_lexeme in KEYWORDS:
+                    tokens.append(Token(TT_kw, corrected_lexeme))
+                elif corrected_lexeme.startswith('"') and corrected_lexeme.endswith('"'):
+                    tokens.append(Token(TT_lit, corrected_lexeme.strip('"')))
 
         return tokens
 
@@ -115,16 +135,53 @@ class Lexer:
             return False
 
     def is_identifier(self, s):
+        # The identifier string is a kw if it's one char away from the closest kw
+        def is_similar_to_keyword(lexeme, max_distance=1):
+            def levenshtein(a, b):
+                m, n = len(a), len(b)
+                dp = [[0] * (n + 1) for _ in range(m + 1)]
+                for i in range(m + 1): dp[i][0] = i
+                for j in range(n + 1): dp[0][j] = j
+                for i in range(1, m + 1):
+                    for j in range(1, n + 1):
+                        cost = 0 if a[i - 1] == b[j - 1] else 1
+                        dp[i][j] = min(
+                            dp[i - 1][j] + 1,      # deletion
+                            dp[i][j - 1] + 1,      # insertion
+                            dp[i - 1][j - 1] + cost  # substitution
+                        )
+                return dp[m][n]
+
+            for kw in KEYWORDS:
+                if levenshtein(lexeme, kw) <= max_distance:
+                    return True
+            return False
+
+        def is_id_too_long(error): 
+            state = False
+            if len(error) >= 15: 
+                state = True
+            return state
+
         # Identifier token pattern
         # Start with a letter (A–Z or a–z) or underscore _
         # Followed by letters, digits (0–9), or underscores
-        return re.match(r'^[A-Za-z_][A-Za-z0-9_]*$', s) is not None
-        # The above depicts usage of RegEx to match the pattern
+        if re.match(r'^[A-Za-z_][A-Za-z0-9_]*$', s):
+            if s in KEYWORDS:
+                return False  # Exact match — not an identifier
+            if is_similar_to_keyword(s):
+                return False  # Too similar — not an identifier
+            if is_id_too_long(s):
+                return False
+            return True
+        return False
+
+
 
 class Error(Lexer):
 
     error_type = ""
-    MAX_ID_LENGTH = 30
+    MAX_ID_LENGTH = 15
     # Using int as 2 bytes
     MAX_INT = 32767
     MIN_INT = -32768
@@ -137,9 +194,8 @@ class Error(Lexer):
         pass
 
     def detect(self, error):
-    
         if (self.__is_id_too_long(error)): 
-            self.error_type = "Identifier exceeds 30 characters"
+            self.error_type = "Identifier exceeds 15 characters"
         elif (self.__is_num_exceeding_length(error)):
             self.error_type = "Numeric type exceeds defined range"
         elif (self.__is_string_ill_formed(error)):
@@ -157,11 +213,15 @@ class Error(Lexer):
         # Triggered if multiple semicolons are present (multiple statements)
         # and an error type occurs that is not fixable at phrase level
         if self.__is_other_error(lexeme):
-            semicolon_count = lexemes.count(';')
-            if semicolon_count > 1:
-                # Skip the infected lexeme and return control to caller
-                return None
-
+            if lexemes.count(';') > 1:
+                # Find the first semicolon AFTER the infected lexeme
+                start_index = lexemes.index(lexeme)
+                for i in range(start_index + 1, len(lexemes)):
+                    if lexemes[i] == ';' and i + 1 < len(lexemes):
+                        # Return the first semicolon after the lexeme
+                        return i
+            # If one or no semicolon found after current lexeme, skip recovery
+            return None
         # Phrase level
         # Fixes misspellings in keywords and ill-formed string literals
         else:
@@ -207,7 +267,8 @@ class Error(Lexer):
                         highest_shared = shared
                         smallest_distance = dist
 
-                # If a valid close keyword was found, consider fixing the invalid one
+                # If a valid close keyword was found, consider fixing the invalid one 
+                # The faulty keyword must less than the closest token
                 if closest:
                     if len(lexeme) <= len(closest):
                         # If lexeme is shorter or equal, only fix if it shares at least 2 chars
@@ -230,16 +291,39 @@ class Error(Lexer):
             self.__is_num_ill_formed(lexeme)
         )
 
-
     # All supported error types    
     def __is_keyword_invalid(self, word):
         return word not in KEYWORDS
     
     def __is_id_too_long(self, error): 
         state = False
-        if self.is_identifier(error) and len(error) >= self.MAX_ID_LENGTH: 
+        def is_similar_to_keyword(lexeme, max_distance=1):
+            def levenshtein(a, b):
+                m, n = len(a), len(b)
+                dp = [[0] * (n + 1) for _ in range(m + 1)]
+                for i in range(m + 1): dp[i][0] = i
+                for j in range(n + 1): dp[0][j] = j
+                for i in range(1, m + 1):
+                    for j in range(1, n + 1):
+                        cost = 0 if a[i - 1] == b[j - 1] else 1
+                        dp[i][j] = min(
+                            dp[i - 1][j] + 1,      # deletion
+                            dp[i][j - 1] + 1,      # insertion
+                            dp[i - 1][j - 1] + cost  # substitution
+                        )
+                return dp[m][n]
+
+            for kw in KEYWORDS:
+                if levenshtein(lexeme, kw) <= max_distance:
+                    return True
+            return False
+
+        is_identifier = (re.match(r'^[A-Za-z_][A-Za-z0-9_]*$', error)) and (is_similar_to_keyword(error) == False)
+
+        if is_identifier and len(error) >= self.MAX_ID_LENGTH: 
             state = True
         return state
+    
     def __is_num_exceeding_length(self, error):
         is_float = self.is_float(error)
         is_int = self.is_integer(error)
@@ -308,22 +392,11 @@ class Error(Lexer):
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
 # Things to keep track of
-# error = Error()
-# print(error.detect("ahsjasjaks_Adjdjdhs_sjbdjsjs_fdkfjdfjdjfbd"))
-# print(error.detect("1.2.2.323323$"))
-# print(error.detect("128781728128"))
-# print(error.detect("10^39"))
-# print('\n\n')
+error = Error()
+print(error.detect("ahsjasjaks_Adjdjdhs_sjbdjsjs_fdkfjdfjdjfbd"))
+print(error.detect("1.2.2.323323$"))
+print(error.detect("128781728128"))
+# Logical error: Can't figure out float
+print(error.detect("1.02^2"))
+print('\n\n')
